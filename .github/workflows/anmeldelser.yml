@@ -1,0 +1,35 @@
+# Henter Google-anmeldelsene (kun 5 stjerner) til anmeldelser.json hver natt.
+# Nøkkelen ligger som repo-hemmelighet: Settings → Secrets → GOOGLE_PLACES_API_KEY
+name: Google-anmeldelser
+
+on:
+  schedule:
+    - cron: '20 4 * * *'   # 04:20 UTC = 06:20 norsk sommertid
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  hent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Hent anmeldelser fra Google
+        env:
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+        run: node bin/hent-anmeldelser.mjs
+      - name: Lagre hvis noe er nytt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- anmeldelser.json; then
+            echo "Ingen endring."
+          else
+            git add anmeldelser.json
+            git commit -m "Oppdaterte Google-anmeldelser"
+            git push
+          fi
