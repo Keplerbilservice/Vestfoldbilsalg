@@ -6,8 +6,10 @@
  * anmeldelser.yml). Nettsiden er statisk, så det finnes ingen server som
  * kan spørre Google i det øyeblikket noen åpner siden; fila er «serveren».
  *
- * Trenger GOOGLE_PLACES_API_KEY i miljøet (repo-hemmelighet). Nøkkelen
- * skal være avgrenset til «Places API (New)» i Google Cloud.
+ * Ingen nøkkel: GitHub Actions henter et kortlevd Google-token via Workload
+ * Identity (google-github-actions/auth) og sender det som GOOGLE_ACCESS_TOKEN,
+ * sammen med GOOGLE_PROJECT (prosjektet som faktureres). Se
+ * .github/workflows/anmeldelser.yml.
  *
  * Google gir maks fem anmeldelser per oppslag. Vi tar vare på dem vi har
  * sett før, så lista vokser over tid selv om Google bare viser de fem
@@ -16,11 +18,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 const FIL = new URL('../anmeldelser.json', import.meta.url);
-const NOKKEL = process.env.GOOGLE_PLACES_API_KEY;
+const TOKEN = process.env.GOOGLE_ACCESS_TOKEN;
+const PROSJEKT = process.env.GOOGLE_PROJECT;
 const SOK = 'Vestfold Bilsalg, Andebuveien 63, 3170 Sem';
 
-if (!NOKKEL) {
-  console.error('GOOGLE_PLACES_API_KEY mangler');
+if (!TOKEN || !PROSJEKT) {
+  console.error('GOOGLE_ACCESS_TOKEN og GOOGLE_PROJECT må være satt');
   process.exit(1);
 }
 
@@ -32,7 +35,8 @@ async function google(sti, felter, body) {
     method: body ? 'POST' : 'GET',
     headers: {
       'Content-Type': 'application/json',
-      'X-Goog-Api-Key': NOKKEL,
+      'Authorization': 'Bearer ' + TOKEN,
+      'X-Goog-User-Project': PROSJEKT,
       'X-Goog-FieldMask': felter,
     },
     body: body ? JSON.stringify(body) : undefined,

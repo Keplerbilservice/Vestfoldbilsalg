@@ -1,5 +1,10 @@
 # Henter Google-anmeldelsene (kun 5 stjerner) til anmeldelser.json hver natt.
-# Nøkkelen ligger som repo-hemmelighet: Settings → Secrets → GOOGLE_PLACES_API_KEY
+#
+# Ingen nøkler: jobben identifiserer seg mot Google Cloud med GitHubs eget
+# OIDC-token (Workload Identity Federation). Google-prosjektet
+# «vestfold-bilsalg-2026» har en tjenestekonto som bare dette repoet får
+# opptre som (satt opp 20. sep 2026 i Cloud Shell). Verdiene under er
+# identifikatorer, ikke hemmeligheter.
 name: Google-anmeldelser
 
 on:
@@ -9,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   hent:
@@ -18,11 +24,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - id: google
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/243646022144/locations/global/workloadIdentityPools/github/providers/github
+          service_account: anmeldelser@vestfold-bilsalg-2026.iam.gserviceaccount.com
+          token_format: access_token
       - name: Hent anmeldelser fra Google
         env:
-          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.google.outputs.access_token }}
+          GOOGLE_PROJECT: vestfold-bilsalg-2026
         run: node bin/hent-anmeldelser.mjs
       - name: Lagre hvis noe er nytt
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -32,4 +47,6 @@ jobs:
             git add anmeldelser.json
             git commit -m "Oppdaterte Google-anmeldelser"
             git push
+            # GitHub Pages bygger ikke av seg selv etter push fra en jobb – be om bygg.
+            gh api -X POST "repos/${{ github.repository }}/pages/builds" >/dev/null || true
           fi
