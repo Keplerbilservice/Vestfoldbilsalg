@@ -80,12 +80,21 @@ const liste = [...alle.values()]
   .sort((a, b) => String(b.publisert || '').localeCompare(String(a.publisert || '')));
 
 const ut = {
-  oppdatert: new Date().toISOString(),
+  oppdatert: gammel.oppdatert || null,
   sted_id: stedId,
   vurdering: sted.rating ?? null,
   antall: sted.userRatingCount ?? null,
   anmeldelser: liste,
 };
 
+// Bare skriv (og dermed committ) når innholdet faktisk er nytt – ellers
+// ville tidsstempelet gitt en ny commit og et nytt Pages-bygg hver natt.
+const { oppdatert: _a, ...nyUten } = ut;
+const { oppdatert: _b, ...gammelUten } = gammel;
+if (JSON.stringify(nyUten) === JSON.stringify(gammelUten)) {
+  console.log('Ingen endring i anmeldelsene.');
+  process.exit(0);
+}
+ut.oppdatert = new Date().toISOString();
 await writeFile(FIL, JSON.stringify(ut, null, 2) + '\n');
 console.log(`Lagret ${liste.length} anmeldelser (${sted.rating} av 5, ${sted.userRatingCount} totalt).`);
